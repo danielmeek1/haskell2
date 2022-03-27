@@ -15,20 +15,20 @@ initLState = LState []
 -- that name and value added.
 -- If it already exists, remove the old value
 updateVars :: Name -> Value -> [(Name, Value)] -> [(Name, Value)]
-updateVars name val vars = (dropVar name vars) ++ [(name,val)]
+updateVars name val vars = dropVar name vars ++ [(name,val)]
 
 -- Return a new set of variables with the given name removed
 dropVar :: Name -> [(Name, Value)] -> [(Name, Value)]
-dropVar name vars= (filter (\(n,_) -> n/=name) vars)
+dropVar name = filter (\(n,_) -> n/=name)
 
 
 
 process :: LState -> Command -> IO ()
-process st (Set var e) 
+process st (Set var e)
      = do let st' = LState (updateVars var (removeMaybe (eval (vars st) e)) (vars st))
           -- st' should include the variable set to the result of evaluating e
           repl st'
-process st (Print e) 
+process st (Print e)
      = do let st' = st
           putStrLn (show  (removeMaybe (eval (vars st') e)))
           -- Print the result of evaluation
