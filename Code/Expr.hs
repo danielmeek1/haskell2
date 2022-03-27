@@ -2,6 +2,8 @@ module Expr where
 import Parsing
 import System.Console.Haskeline
 
+import Data.Char hiding (digitToInt)
+
 type Name = String
 
 
@@ -13,12 +15,13 @@ data Expr = Add Expr Expr
           | Mult Expr Expr
           | Div Expr Expr
           | ToString Expr
+          | ToInt Expr
           | Val Value
           | Var Name --variable name
-          | Concat Expr Expr
+          | Input
   deriving Show
 
-data Value = IntVal Int | StrVal String
+data Value = IntVal Int | StrVal String 
 
 instance Show Value where
   show (IntVal a) = show a
@@ -42,7 +45,10 @@ eval vars (Add x y) = case eval vars x of
                         Just (IntVal x) -> case eval vars y of
                                     Just (IntVal y) -> Just (IntVal (x + y))
                                     _ -> Nothing
-                        _ ->  Nothing
+                        Just (StrVal a) ->  case eval vars y of
+                                    Just (StrVal b) -> Just (StrVal (a ++ b))
+                                    _-> Nothing
+                        _ -> Nothing
 eval vars (Sub x y) = case eval vars x of
                         Just (IntVal x) -> case eval vars y of
                                     Just (IntVal y) -> Just (IntVal (x - y))
@@ -58,12 +64,13 @@ eval vars (Div x y) = case eval vars x of
                                     Just (IntVal y) -> Just (IntVal (x `div` y))
                                     _ -> Nothing
                         _ ->  Nothing
-eval vars (ToString x) = Just (StrVal (show (eval vars x)))
-eval vars (Concat a b) = case eval vars a of
-                          Just (StrVal x) -> case eval vars b of
-                                              Just (StrVal y) -> Just (StrVal (x++y))
-                                              _ -> Nothing
-                          _-> Nothing
+eval vars (ToString x) = Just (StrVal (show (removeMaybe(eval vars x))))
+eval vars (ToInt x) = case eval vars x of
+                        Just (StrVal s) -> if all isDigit s then
+                           Just (IntVal (digitsToInt s)) else
+                             Nothing 
+                        _ -> Nothing
+
 
 digitToInt :: Char -> Int
 digitToInt x = fromEnum x - fromEnum '0'
@@ -105,26 +112,39 @@ pExpr = do t <- pTerm
                    char '-'
                    space
                    Sub t <$> pExpr
-            ||| do space
-                   char '"'
-                   e <- many (alphanum ||| oneSpace)
-                   char '"'                  
-                   space
-                   return (Val (StrVal e))
                  ||| return t
 
 
 pFactor :: Parser Expr
-pFactor = do d <- digit
-             ds <- many digit
-             return (Val (IntVal (digitsToInt (d:ds))))
-         ||| do v <- many letter
-                return (Var v)
-         ||| do  space
-                 char '('
+pFactor = do string "input"
+             return Input
+         ||| do d <- digit
+                ds <- many digit
+                return (Val (IntVal (digitsToInt (d:ds))))
+         ||| do  char '('
                  e <- pExpr
                  char ')'
                  return e
+         ||| do space
+                char '\0'
+                e <- many printable
+                char '\0'
+                space
+                return (Val (StrVal e))
+         ||| do string "toString("
+                space
+                e <- pExpr
+                space
+                char ')'
+                return(ToString e)
+         ||| do string "toInt("
+                space
+                e <- pExpr
+                space
+                char ')'
+                return(ToInt e)
+         ||| do v <- many letter
+                return (Var v)
 
 pTerm :: Parser Expr
 pTerm = do f <- pFactor
@@ -151,3 +171,7 @@ input =  runInputT defaultSettings input
          case usrinput of
             Nothing -> return []
             Just given -> return given
+
+removeMaybe :: Maybe a ->  a
+removeMaybe (Just a) = a
+removeMaybe Nothing = error "No value"

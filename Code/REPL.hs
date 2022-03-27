@@ -24,15 +24,18 @@ dropVar name = filter (\(n,_) -> n/=name)
 
 
 process :: LState -> Command -> IO ()
+process st (Set var Input)
+     = do inp <- usrIn
+          -- st' should include the variable set to the result of evaluating e
+          repl (LState (updateVars var (StrVal inp) (vars st)))
 process st (Set var e)
      = do let st' = LState (updateVars var (removeMaybe (eval (vars st) e)) (vars st))
           -- st' should include the variable set to the result of evaluating e
           repl st'
 process st (Print e)
-     = do let st' = st
-          putStrLn (show  (removeMaybe (eval (vars st') e)))
+     = do print (removeMaybe (eval (vars st) e))
           -- Print the result of evaluation
-          repl st'
+          repl st
 
 -- Read, Eval, Print Loop
 -- This reads and parses the input using the pCommand parser, and calls
@@ -49,9 +52,19 @@ getCommand =  runInputT defaultSettings input
             Nothing -> return []
             Just given -> return given
 
+usrIn :: IO String
+usrIn =  runInputT defaultSettings input
+   where
+      input :: InputT IO String
+      input = do
+         usrinput <- getInputLine " "
+         case usrinput of
+            Nothing -> return []
+            Just given -> return given
+
 repl :: LState -> IO ()
 repl st = do inp <- getCommand
-             case parse pCommand inp of
+             case parse pCommand (replaceChars inp '"' '\0') of
                   [(Quit,"")] -> putStrLn "Closing session"
                   [(cmd, "")] -> -- Must parse entire input
                           process st cmd
@@ -60,7 +73,3 @@ repl st = do inp <- getCommand
 
 replaceChars :: String -> Char -> Char -> String
 replaceChars s c1 c2 = map (\c -> if c==c1 then c2 else c) s
-
-removeMaybe :: Maybe a ->  a
-removeMaybe (Just a) = a
-removeMaybe Nothing = error "No value"
