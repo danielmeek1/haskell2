@@ -32,15 +32,14 @@ process st ((Set var Input):cs)
      = do inp <- usrIn
           process (LState (updateVars var (StrVal inp) (vars st))) cs
 process st ((Set var e):cs)
-     = process (LState (updateVars var (removeMaybe (eval (vars st) e)) (vars st))) cs
+     =    process (LState (updateVars var (removeMaybe (eval (vars st) e)) (vars st))) cs
 process st ((Print e):cs)
      = do print (removeMaybe (eval (vars st) e))
           process st cs
 process st ((File f):cs)
-     = do
-        exists <-  doesFileExist f
-        processFile st f exists
-        process st cs
+     = do exists <-  doesFileExist f
+          processFile st f exists
+          process st cs
 
 process st (NoCommand:cs)  = process st cs
 process st (Quit:cs)       = exitSuccess

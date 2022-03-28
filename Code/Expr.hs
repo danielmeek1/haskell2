@@ -16,7 +16,7 @@ data Expr = Add      Expr Expr
           | Div      Expr Expr
           | Abs      Expr          --find the absolute value of a number
           | Pow      Expr Expr
-          | Mod      Expr Expr 
+          | Mod      Expr Expr
           | ToString Expr          --convert a number to a string
           | ToInt    Expr          --convert a string to an integer 
           | Val      Value         --a value
@@ -65,116 +65,86 @@ eval vars Input      = Just (Error "cannot evaluate input that has not been give
 eval vars (Var x) = case getElem vars (Variable (x,IntVal 0)) of
                      Just (Variable (_,v))       -> Just v
                      _                           -> Nothing
-
-
 {-
        Evaluate addition
 -}
-eval vars (Add x y) = case eval vars x of
-                        Just (IntVal x)   -> case eval vars y of
-                                    Just (IntVal y)     -> Just (IntVal (x + y))
-                                    Just (FloatVal y)   -> Just (FloatVal (fromIntegral x + y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'+' operator must be used between two numbers or two strings")
-
-                        Just (FloatVal x) -> case eval vars y of
-                                    Just (IntVal y)     -> Just (FloatVal (x + fromIntegral y))
-                                    Just (FloatVal y)   -> Just (FloatVal (x +  y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'+' operator must be used between two numbers or two strings")
-
-                        Just (StrVal a)   -> case eval vars y of
-                                    Just (StrVal b)     -> Just (StrVal (a ++ b))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'+' operator must be used between two numbers or two strings")
-
-                        Just (Error e)    -> Just (Error e)
-                        _                 -> Just (Error "'+' operator must be used between two numbers or two strings")
+eval vars (Add x y) = case (eval vars x, eval vars y) of
+                            (Just (IntVal x),Just (IntVal y))         -> Just (IntVal (x + y))
+                            (Just (IntVal x),Just (FloatVal y))       -> Just (FloatVal (fromIntegral x + y))
+                            (Just (FloatVal x),Just (IntVal y))       -> Just (FloatVal (x + fromIntegral y))
+                            (Just (FloatVal x),Just (FloatVal y))     -> Just (FloatVal (x + y))
+                            (Just (StrVal x),Just (StrVal y))         -> Just (StrVal (x ++ y))
+                            (Just (Error e),_)                        -> Just (Error e)
+                            (_,Just (Error e))                        -> Just (Error e)
+                            _                 -> Just (Error "'+' operator must be used between two numbers or two strings")
 
 {-
        Evaluate subtraction
 -}
-eval vars (Sub x y) = case eval vars x of
-                        Just (IntVal x)   -> case eval vars y of
-                                    Just (IntVal y)     -> Just (IntVal (x - y))
-                                    Just (FloatVal y)   -> Just (FloatVal (fromIntegral x -  y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'-' operator must be used between two numbers")
-                        Just (FloatVal x) -> case eval vars y of
-                                    Just (IntVal y)     -> Just (FloatVal (x - fromIntegral y))
-                                    Just (FloatVal y)   -> Just (FloatVal (x - y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'-' operator must be used between two numbers")
-                        Just (Error e)    -> Just (Error e)
-                        _                 -> Just (Error "'-' operator must be used between two numbers")
+eval vars (Sub x y) = case (eval vars x, eval vars y) of
+                            (Just (Error e),_)                        -> Just (Error e)
+                            (_,Just (Error e))                        -> Just (Error e)
+                            (Just (IntVal x),Just (IntVal y))         -> Just (IntVal (x - y))
+                            (Just (IntVal x),Just (FloatVal y))       -> Just (FloatVal (fromIntegral x - y))
+                            (Just (FloatVal x),Just (IntVal y))       -> Just (FloatVal (x - fromIntegral y))
+                            (Just (FloatVal x),Just (FloatVal y))     -> Just (FloatVal (x - y))
+                            _                                         -> Just (Error "'-' operator must be used between two numbers")
 
 {-
        Evaluate multiplication
 -}
-eval vars (Mult x y) = case eval vars x of
-                        Just (IntVal x)   -> case eval vars y of
-                                    Just (IntVal y)     -> Just (IntVal (x * y))
-                                    Just (FloatVal y)   -> Just (FloatVal (fromIntegral x * y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'*' operator must be used between two numbers")
-                        Just (FloatVal x) -> case eval vars y of
-                                    Just (IntVal y)     -> Just (FloatVal (x * fromIntegral y))
-                                    Just (FloatVal y)   -> Just (FloatVal (x * y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'*' operator must be used between two numbers")
-                        Just (Error e)    -> Just (Error e)
-                        _                 -> Just (Error "'*' operator must be used between two numbers")
+eval vars (Mult x y) = case (eval vars x, eval vars y) of
+                            (Just (IntVal x),Just (IntVal y))         -> Just (IntVal (x * y))
+                            (Just (IntVal x),Just (FloatVal y))       -> Just (FloatVal (fromIntegral x * y))
+                            (Just (FloatVal x),Just (IntVal y))       -> Just (FloatVal (x * fromIntegral y))
+                            (Just (FloatVal x),Just (FloatVal y))     -> Just (FloatVal (x * y))
+                            (Just (Error e),_)                        -> Just (Error e)
+                            (_,Just (Error e))                        -> Just (Error e)
+                            _                                         -> Just (Error "'*' operator must be used between two numbers")
+
 
 {-
        Evaluate division
 -}
-eval vars (Div x y) = case eval vars x of
-                        Just (IntVal x)   -> case eval vars y of
-                                    Just (IntVal y)     -> Just (FloatVal (fromIntegral x / fromIntegral y))
-                                    Just (FloatVal y)   -> Just (FloatVal (fromIntegral x / y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'/' operator must be used between two numbers")
-                        Just (FloatVal x) -> case eval vars y of
-                                    Just (IntVal y)     -> Just (FloatVal (x / fromIntegral y))
-                                    Just (FloatVal y)   -> Just (FloatVal (x / y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'/' operator must be used between two numbers")
-                        Just (Error e)    -> Just (Error e)
-                        _                 -> Just (Error "'/' operator must be used between two numbers")
+eval vars (Div x y) = case (eval vars x, eval vars y) of
 
+                            (Just (IntVal x),Just (IntVal y))         -> Just (IntVal (x `div` y))
+                            (Just (IntVal x),Just (FloatVal y))       -> Just (FloatVal (fromIntegral x / y))
+                            (Just (FloatVal x),Just (IntVal y))       -> Just (FloatVal (x / fromIntegral y))
+                            (Just (FloatVal x),Just (FloatVal y))     -> Just (FloatVal (x / y))
+                            (Just (Error e),_)                        -> Just (Error e)
+                            (_,Just (Error e))                        -> Just (Error e)
+                            _                                         -> Just (Error "'/' operator must be used between two numbers")
+
+{-
+       Evaluate |...| (Abs)
+-}
 eval vars (Abs e) = case eval vars e of
                      Just (IntVal y)      -> Just (IntVal (abs y))
                      Just (FloatVal y)    -> Just (FloatVal (abs y))
                      Just (Error e)       -> Just (Error e)
                      _                    -> Just (Error "'|...|' operator must be used on a number")
 
-eval vars (Pow x y) = case eval vars x of
-                        Just (IntVal x)   -> case eval vars y of
-                                    Just (IntVal y)     -> Just (IntVal (x ^ y))
-                                    Just (FloatVal y)   -> Just (FloatVal (fromIntegral x ** y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'^' operator must be used between two numbers")
-
-                        Just (FloatVal x) -> case eval vars y of
-                                    Just (IntVal y)     -> Just (FloatVal (x ** fromIntegral y))
-                                    Just (FloatVal y)   -> Just (FloatVal (x **  y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'^' operator must be used between two numbers")
-
-                        Just (Error e)    -> Just (Error e)
-                        _                 -> Just (Error "'^' operator must be used between two numbers")
+{-
+       Evaluate ^ (Power)
+-}
+eval vars (Pow x y) = case (eval vars x, eval vars y) of
+                            (Just (IntVal x),Just (IntVal y))         -> Just (IntVal (x ^ y))
+                            (Just (IntVal x),Just (FloatVal y))       -> Just (FloatVal (fromIntegral x ** y))
+                            (Just (FloatVal x),Just (IntVal y))       -> Just (FloatVal (x ** fromIntegral y))
+                            (Just (FloatVal x),Just (FloatVal y))     -> Just (FloatVal (x ** y))
+                            (Just (Error e),_)                        -> Just (Error e)
+                            (_,Just (Error e))                        -> Just (Error e)
+                            _                                         -> Just (Error "'^' operator must be used between two numbers")
 
 {-
        Evaluate % (Mod)
 -}
-eval vars (Mod x y) = case eval vars x of
-                        Just (IntVal x)   -> case eval vars y of
-                                    Just (IntVal y)     -> Just (IntVal (x `mod` y))
-                                    Just (Error e)      -> Just (Error e)
-                                    _                   -> Just (Error "'%' operator must be used between two Integers")
-
-                        Just (Error e)    -> Just (Error e)
-                        _                 -> Just (Error "'%' operator must be used between two Integers")
+eval vars (Mod x y) = case (eval vars x, eval vars y) of
+                            (Just (IntVal x),Just (IntVal y))         -> Just (IntVal (x `mod` y))
+                            (Just (Error e),_)                        -> Just (Error e)
+                            (_,Just (Error e))                        -> Just (Error e)
+                            _                                         -> Just (Error "'%' operator must be used between two Integers")
 
 {-
        Evaluate ToString
@@ -315,10 +285,10 @@ pTerm = do f <- pFactor
                    e <- pTerm
                    space
                    return (Div f e)
-            ||| do space 
+            ||| do space
                    char '%'
                    space
-                   Mod f <$> pTerm            
+                   Mod f <$> pTerm
             ||| do char '^'
                    space
                    Pow f <$> pExpr
