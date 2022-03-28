@@ -3,25 +3,27 @@ module REPL where
 import Expr
 import Parsing
 
+import BinaryTree
 import System.IO
 import System.Console.Haskeline
-import System.Exit
-import System.Directory
+    ( getInputLine, defaultSettings, runInputT, InputT )
+import System.Exit ( exitSuccess )
+import System.Directory ( doesFileExist )
 
-data LState = LState { vars :: [(Name, Value)] }
+
+
+newtype LState = LState {
+                -- | variables in the program
+                vars :: BTree Variable }
 
 initLState :: LState
-initLState = LState []
+initLState = LState Leaf
 
 -- Given a variable name and a value, return a new set of variables with
 -- that name and value added.
 -- If it already exists, remove the old value
-updateVars :: Name -> Value -> [(Name, Value)] -> [(Name, Value)]
-updateVars name val vars = dropVar name vars ++ [(name,val)]
-
--- Return a new set of variables with the given name removed
-dropVar :: Name -> [(Name, Value)] -> [(Name, Value)]
-dropVar name = filter (\(n,_) -> n/=name)
+updateVars :: Name -> Value -> BTree Variable -> BTree Variable
+updateVars name val vars = insert vars (Variable (name,val))
 
 
 process :: LState -> [Command] -> IO ()

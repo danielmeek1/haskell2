@@ -3,7 +3,7 @@ import Parsing
 import System.Console.Haskeline
 
 import Data.Char ( isDigit )
-
+import BinaryTree
 type Name = String
 
 
@@ -21,14 +21,8 @@ data Expr = Add      Expr Expr
           | ToInt    Expr          --convert a string to an integer 
           | Val      Value         --a value
           | Var      Name          --variable name
-
           | Input
   deriving Show
-
-data Value = IntVal         Int
-           | FloatVal       Float
-           | StrVal         String
-           | Error          String
 
 instance Show Value where
   show (IntVal a)    = show a
@@ -44,7 +38,22 @@ data Command = Set          Name Expr     -- assign an expression to a variable 
              | NoCommand                  -- user did not enter a command
   deriving Show
 
-eval :: [(Name, Value)] -> -- Variable name to value mapping
+
+data Value = IntVal         Int
+           | FloatVal       Float
+           | StrVal         String
+           | Error          String
+
+newtype Variable = Variable (Name,Value)
+
+instance Eq Variable where
+       (==) (Variable (n1,_)) (Variable (n2,_))         = n1==n2
+
+instance Ord Variable where
+       compare (Variable (n1,_)) (Variable (n2,_))      = compare n1 n2
+
+
+eval :: BTree Variable -> -- Variable name to value mapping
                    Expr -> -- Expression to evaluate
             Maybe Value -- Result (if no errors such as missing variables)
 eval vars (Val x)    = Just x -- for values, just give the value directly
@@ -53,9 +62,10 @@ eval vars Input      = Just (Error "cannot evaluate input that has not been give
 {-
        Evaluate value of variable
 -}
-eval vars (Var x)
-                | hasVar vars x = Just (snd (head (filter (\(n,v) -> n==x) vars)))
-                | otherwise = Just (Error ("variable " ++ x ++ " not in scope"))
+eval vars (Var x) = case getElem vars (Variable (x,IntVal 0)) of
+                     Just (Variable (_,v))       -> Just v
+                     _                           -> Nothing
+
 
 {-
        Evaluate addition
@@ -154,6 +164,9 @@ eval vars (Pow x y) = case eval vars x of
                         Just (Error e)    -> Just (Error e)
                         _                 -> Just (Error "'^' operator must be used between two numbers")
 
+{-
+       Evaluate % (Mod)
+-}
 eval vars (Mod x y) = case eval vars x of
                         Just (IntVal x)   -> case eval vars y of
                                     Just (IntVal y)     -> Just (IntVal (x `mod` y))
@@ -239,10 +252,6 @@ pExpr = do t <- pTerm
                    space
                    char '|'
                    return (Abs e)
-            ||| do space 
-                   char '%'
-                   space
-                   Mod t <$> pExpr
                  ||| return t
 
 
@@ -306,7 +315,10 @@ pTerm = do f <- pFactor
                    e <- pTerm
                    space
                    return (Div f e)
-
+            ||| do space 
+                   char '%'
+                   space
+                   Mod f <$> pTerm            
             ||| do char '^'
                    space
                    Pow f <$> pExpr
@@ -325,4 +337,4 @@ input =  runInputT defaultSettings input
 
 removeMaybe :: Maybe a ->  a
 removeMaybe (Just a) = a
-removeMaybe Nothing = error "No value"
+removeMaybe Nothing  = error "No value"
