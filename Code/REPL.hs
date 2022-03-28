@@ -21,21 +21,35 @@ updateVars name val vars = dropVar name vars ++ [(name,val)]
 dropVar :: Name -> [(Name, Value)] -> [(Name, Value)]
 dropVar name = filter (\(n,_) -> n/=name)
 
+processSet:: LState -> Name -> Expr -> LState
+processSet st var e = LState (updateVars var (removeMaybe (eval (vars st) e)) (vars st))
 
+processPrint :: LState -> Expr -> IO()
+processPrint st e = print (removeMaybe (eval (vars st) e))
 
-process :: LState -> Command -> IO ()
-process st (Set var Input)
+process :: LState -> [Command] -> IO ()
+process st [] = repl st
+
+process st ((Set var Input):cs)
      = do inp <- usrIn
           -- st' should include the variable set to the result of evaluating e
-          repl (LState (updateVars var (StrVal inp) (vars st)))
-process st (Set var e)
-     = do let st' = LState (updateVars var (removeMaybe (eval (vars st) e)) (vars st))
-          -- st' should include the variable set to the result of evaluating e
-          repl st'
-process st (Print e)
-     = do print (removeMaybe (eval (vars st) e))
-          -- Print the result of evaluation
-          repl st
+          process (LState (updateVars var (StrVal inp) (vars st))) cs
+
+process st ((Set var e):cs)
+     = process (processSet st var e) cs
+
+process st ((Print e):cs)
+     = do processPrint st e
+          process st cs
+
+process st ((File f):cs)
+     = do contents <- readFile f
+          let commands = map (\l -> fst(head (parse pCommand (replaceChars l '"' '\0')) )) (lines contents)
+          process st commands
+
+process st (NoCommand:cs) = process st cs
+process st (Quit:cs) = error "Quit is not executable" --cannot be executed
+
 
 -- Read, Eval, Print Loop
 -- This reads and parses the input using the pCommand parser, and calls
@@ -57,18 +71,20 @@ usrIn =  runInputT defaultSettings input
    where
       input :: InputT IO String
       input = do
-         usrinput <- getInputLine " "
+         usrinput <- getInputLine ""
          case usrinput of
             Nothing -> return []
             Just given -> return given
 
+
 repl :: LState -> IO ()
-repl st = do inp <- getCommand
+repl st = do putChar '>'
+             inp <- usrIn
              case parse pCommand (replaceChars inp '"' '\0') of
                   [(Quit,"")] -> putStrLn "Closing session"
                   [(cmd, "")] -> -- Must parse entire input
-                          process st cmd
-                  _ -> do putStrLn "Parse error"
+                          process st [cmd]
+                  _ -> do putStrLn "parse error"
                           repl st
 
 replaceChars :: String -> Char -> Char -> String

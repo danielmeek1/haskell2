@@ -21,54 +21,94 @@ data Expr = Add Expr Expr
           | Input
   deriving Show
 
-data Value = IntVal Int | StrVal String 
+data Value = IntVal Int | StrVal String | Error String
 
 instance Show Value where
   show (IntVal a) = show a
   show (StrVal a) = a
+  show (Error a) = a
 
 -- These are the REPL commands
 data Command = Set Name Expr -- assign an expression to a variable name
              | Print Expr    -- evaluate an expression and print the result
+             | File String -- load a file and execute commands within it.
              | Quit
+             | NoCommand
   deriving Show
 
 eval :: [(Name, Value)] -> -- Variable name to value mapping
         Expr -> -- Expression to evaluate
         Maybe Value -- Result (if no errors such as missing variables)
 eval vars (Val x) = Just x -- for values, just give the value directly
-eval [] (Var x) = Nothing
+eval vars Input = Just (Error "cannot evaluate input that has not been given")
+
+{-
+       Evaluate value of variable
+-}
 eval vars (Var x)
                 | hasVar vars x = Just (snd (head (filter (\(n,v) -> n==x) vars)))
-                | otherwise = Nothing--returns value of a variable
+                | otherwise = Just (Error ("variable " ++ x ++ " not in scope"))
+
+{-
+       Evaluate addition
+-}
 eval vars (Add x y) = case eval vars x of
                         Just (IntVal x) -> case eval vars y of
                                     Just (IntVal y) -> Just (IntVal (x + y))
-                                    _ -> Nothing
+                                    Just (Error e) -> Just (Error e)
+                                    _ -> Just (Error "'+' operator must be used between two numbers or two strings")
                         Just (StrVal a) ->  case eval vars y of
                                     Just (StrVal b) -> Just (StrVal (a ++ b))
-                                    _-> Nothing
-                        _ -> Nothing
+                                    Just (Error e) -> Just (Error e)
+                                    _ -> Just (Error "'+' operator must be used between two numbers or two strings")
+                        Just (Error e) -> Just (Error e)
+                        _ -> Just (Error "'+' operator must be used between two numbers or two strings")
+
+{-
+       Evaluate subtraction
+-}
 eval vars (Sub x y) = case eval vars x of
                         Just (IntVal x) -> case eval vars y of
                                     Just (IntVal y) -> Just (IntVal (x - y))
-                                    _ -> Nothing
-                        _ ->  Nothing
+                                    Just (Error e) -> Just (Error e)
+                                    _ -> Just (Error "'-' operator must be used between two numbers")
+                        Just (Error e) -> Just (Error e)
+                        _ -> Just (Error "'-' operator must be used between two numbers")
+
+{-
+       Evaluate multiplication
+-}
 eval vars (Mult x y) = case eval vars x of
                         Just (IntVal x) -> case eval vars y of
                                     Just (IntVal y) -> Just (IntVal (x * y))
-                                    _ -> Nothing
-                        _ ->  Nothing
+                                    Just (Error e) -> Just (Error e)
+                                    _ -> Just (Error "'*' operator must be used between two numbers")
+                        Just (Error e) -> Just (Error e)
+                        _ -> Just (Error "'*' operator must be used between two numbers")
+
+{-
+       Evaluate division
+-}
 eval vars (Div x y) = case eval vars x of
                         Just (IntVal x) -> case eval vars y of
                                     Just (IntVal y) -> Just (IntVal (x `div` y))
-                                    _ -> Nothing
-                        _ ->  Nothing
+                                    Just (Error e) -> Just (Error e)
+                                    _ -> Just (Error "'/' operator must be used between two numbers")
+                        Just (Error e) -> Just (Error e)
+                        _ -> Just (Error "'/' operator must be used between two numbers")
+
+{-
+       Evaluate ToString
+-}
 eval vars (ToString x) = Just (StrVal (show (removeMaybe(eval vars x))))
+
+{-
+       Evaluate ToInt
+-}
 eval vars (ToInt x) = case eval vars x of
                         Just (StrVal s) -> if all isDigit s then
                            Just (IntVal (digitsToInt s)) else
-                             Nothing 
+                             Nothing
                         _ -> Nothing
 
 
@@ -76,11 +116,10 @@ digitToInt :: Char -> Int
 digitToInt x = fromEnum x - fromEnum '0'
 
 digitsToInt :: [Char] -> Int
-digitsToInt (d:ds) = foldl (\ x y ->10*x + y) 0 (map digitToInt (d:ds))
 digitsToInt [] = error "No numbers given"
+digitsToInt (d:ds) |d=='-' = -1 * foldl (\ x y ->10*x + y) 0 (map digitToInt ds)
+                   |otherwise = foldl (\ x y ->10*x + y) 0 (map digitToInt (d:ds))
 
-concatenate :: Expr -> Expr -> Value
-concatenate (Val (StrVal s1)) (Val (StrVal s2)) = StrVal (s1 ++ s2)
 
 hasVar ::  [(Name, Value)] -> Name  -> Bool
 hasVar [] n = False
@@ -100,6 +139,14 @@ pCommand = do t <- letter
                    Print <$> pExpr
             ||| do string "quit"
                    return Quit
+            ||| do string "file"
+                   space
+                   char '\0'
+                   t <- many printable 
+                   char '\0'
+                   return (File t)
+            ||| do string ""
+                   return NoCommand
 
 
 pExpr :: Parser Expr
@@ -118,7 +165,7 @@ pExpr = do t <- pTerm
 pFactor :: Parser Expr
 pFactor = do string "input"
              return Input
-         ||| do d <- digit
+         ||| do d <- digit ||| char '-'
                 ds <- many digit
                 return (Val (IntVal (digitsToInt (d:ds))))
          ||| do  char '('
