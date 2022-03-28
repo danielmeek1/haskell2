@@ -2,7 +2,7 @@ module Expr where
 import Parsing
 import System.Console.Haskeline
 
-import Data.Char hiding (digitToInt)
+import Data.Char ( isDigit )
 
 type Name = String
 
@@ -15,16 +15,19 @@ data Expr = Add      Expr Expr
           | Mult     Expr Expr
           | Div      Expr Expr
           | Abs      Expr          --find the absolute value of a number
+          | Pow      Expr Expr
+          | Mod      Expr Expr 
           | ToString Expr          --convert a number to a string
           | ToInt    Expr          --convert a string to an integer 
           | Val      Value         --a value
           | Var      Name          --variable name
+
           | Input
   deriving Show
 
-data Value = IntVal         Int 
-           | FloatVal       Float 
-           | StrVal         String 
+data Value = IntVal         Int
+           | FloatVal       Float
+           | StrVal         String
            | Error          String
 
 instance Show Value where
@@ -134,6 +137,32 @@ eval vars (Abs e) = case eval vars e of
                      Just (FloatVal y)    -> Just (FloatVal (abs y))
                      Just (Error e)       -> Just (Error e)
                      _                    -> Just (Error "'|...|' operator must be used on a number")
+
+eval vars (Pow x y) = case eval vars x of
+                        Just (IntVal x)   -> case eval vars y of
+                                    Just (IntVal y)     -> Just (IntVal (x ^ y))
+                                    Just (FloatVal y)   -> Just (FloatVal (fromIntegral x ** y))
+                                    Just (Error e)      -> Just (Error e)
+                                    _                   -> Just (Error "'^' operator must be used between two numbers")
+
+                        Just (FloatVal x) -> case eval vars y of
+                                    Just (IntVal y)     -> Just (FloatVal (x ** fromIntegral y))
+                                    Just (FloatVal y)   -> Just (FloatVal (x **  y))
+                                    Just (Error e)      -> Just (Error e)
+                                    _                   -> Just (Error "'^' operator must be used between two numbers")
+
+                        Just (Error e)    -> Just (Error e)
+                        _                 -> Just (Error "'^' operator must be used between two numbers")
+
+eval vars (Mod x y) = case eval vars x of
+                        Just (IntVal x)   -> case eval vars y of
+                                    Just (IntVal y)     -> Just (IntVal (x `mod` y))
+                                    Just (Error e)      -> Just (Error e)
+                                    _                   -> Just (Error "'%' operator must be used between two Integers")
+
+                        Just (Error e)    -> Just (Error e)
+                        _                 -> Just (Error "'%' operator must be used between two Integers")
+
 {-
        Evaluate ToString
 -}
@@ -185,7 +214,7 @@ pCommand = do t <- letter
             ||| do string "file"
                    space
                    char '\0'
-                   t <- many printable 
+                   t <- many printable
                    char '\0'
                    return (File t)
 
@@ -203,12 +232,17 @@ pExpr = do t <- pTerm
                    char '-'
                    space
                    Sub t <$> pExpr
-            ||| do space 
+            ||| do space
                    char '|'
+                   space
                    e <- pExpr
-                   space 
+                   space
                    char '|'
                    return (Abs e)
+            ||| do space 
+                   char '%'
+                   space
+                   Mod t <$> pExpr
                  ||| return t
 
 
@@ -216,11 +250,11 @@ pFactor :: Parser Expr
 pFactor = do string "input"
              return Input
 
-         ||| do d <- digit ||| char '-' 
-                ds <- many digit 
+         ||| do d <- digit ||| char '-'
+                ds <- many digit
                 char '.'
-                n <- digit 
-                ns <- many digit 
+                n <- digit
+                ns <- many digit
                 return (Val (FloatVal (digitsToFloat ( (d:ds) ++ "." ++ (n:ns) ) )))
 
          ||| do d <- digit ||| char '-'
@@ -253,6 +287,8 @@ pFactor = do string "input"
                 char ')'
                 return(ToInt e)
 
+
+
          ||| do v <- many letter
                 return (Var v)
 
@@ -270,6 +306,11 @@ pTerm = do f <- pFactor
                    e <- pTerm
                    space
                    return (Div f e)
+
+            ||| do char '^'
+                   space
+                   Pow f <$> pExpr
+
                  ||| return f
 
 input :: IO String

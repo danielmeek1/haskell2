@@ -40,8 +40,6 @@ process st ((File f):cs)
         processFile st f exists
         process st cs
 
-
-
 process st (NoCommand:cs)  = process st cs
 process st (Quit:cs)       = exitSuccess
 
@@ -76,7 +74,6 @@ repl st = do putChar '>'
 
 executeCommand :: LState -> String -> IO()
 executeCommand st inp = case parse pCommand (replaceChars inp '"' '\0') of
-                              [(Quit,"")] -> putStrLn "Closing session"
                               [(cmd, "")] -> -- Must parse entire input
                                     process st [cmd]
                               _ -> do putStrLn "parse error"
