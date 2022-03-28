@@ -1,6 +1,4 @@
 y = 3
-print "enter a number"
-z = input
+z = "5"
 x = y + toInt(z)
 print(z + " + 3 = " + toString(x))
-quit
