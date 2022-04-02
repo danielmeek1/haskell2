@@ -60,6 +60,9 @@ data Command = Set          Name Expr                   -- assign an expression 
              | File         String                      -- load a file and execute commands within it.
              | Block        String                      -- List of commands
              | If           Expr Command Command        -- if-else statement
+             | Repeat       Expr Command                -- repeat a command a given number of times
+             | For          Expr Expr Command Command   -- for loop
+             | While        Expr Command                -- while loop
              | Quit                                     -- Exit the system
              | NoCommand                                -- user did not enter a command
   deriving Show
@@ -92,7 +95,7 @@ eval vars Input           = Just (Error "cannot evaluate input that has not been
 -}
 eval vars (Var x) = case getElem vars (Variable (x,IntVal 0)) of
                          Just (Variable (_,v))       -> Just v
-                         _                           -> Nothing
+                         _                           -> Just (Error ("Variable not in scope: "++x))
 {-
        Evaluate addition or concatenation
 -}
@@ -244,38 +247,87 @@ pCommand = do t <- letter
               space
               Set (t:ts) <$> pExpr
 
-            ||| do string "print"
+            ||| do space
+                   string "print"
                    space
                    Print <$> pExpr
 
-            ||| do string "quit"
+            ||| do space
+                   string "quit"
+                   space
                    return Quit
 
-            ||| do string "file"
+            ||| do space
+                   string "file"
                    space
                    char '\0'
                    t <- many printable
                    char '\0'
+                   space
                    return (File t)
-            ||| do string "if("
+            ||| do space
+                   string "if("
+                   space
                    e <- pExpr
                    space
                    char ')'
+                   space
                    t <-pCommand
                    space
                    string "else"
+                   space
                    If e t <$> pCommand
-            ||| do string "if("
+            ||| do space
+                   string "if("
+                   space
                    e <- pExpr
                    space
                    char ')'
+                   space
                    t <-pCommand
+                   space
                    return (If e t NoCommand)
             ||| do space
                    char '{'
+                   space
                    cs <- blockString
+                   space
                    char '}'
+                   space
                    return (Block cs)
+            ||| do space
+                   string "repeat"
+                   space
+                   n <- pExpr
+                   space
+                   Repeat n <$> pCommand
+            ||| do space 
+                   string "for("
+                   space 
+                   i <- pExpr
+                   space 
+                   char ';'
+                   space 
+                   t <- pExpr
+                   space
+                   char ';'
+                   space 
+                   m <- pCommand
+                   space
+                   char ')'
+                   space 
+                   c <- pCommand
+                   space
+                   return (For i t m c)
+            ||| do space
+                   string "while("
+                   space 
+                   e <- pExpr
+                   space 
+                   char ')'
+                   space 
+                   c <- pCommand
+                   return (While e c)
 
             ||| do string ""
                    return NoCommand
@@ -300,6 +352,7 @@ pExpr = do t <- pTerm
                    e <- pExpr
                    space
                    char '|'
+                   space
                    return (Abs e)
             ||| do space
                    string "=="
@@ -310,7 +363,15 @@ pExpr = do t <- pTerm
                    string "!="
                    space
                    NQU t <$> pExpr
+            ||| do space
+                   string ">="
+                   space
+                   GRE t <$> pExpr
 
+            ||| do space
+                   string "<="
+                   space
+                   LEE t <$> pExpr
             ||| do space
                    string "<"
                    space
@@ -321,21 +382,15 @@ pExpr = do t <- pTerm
                    space
                    GTH t <$> pExpr
 
-            ||| do space
-                   string ">="
-                   space
-                   GRE t <$> pExpr
 
-            ||| do space
-                   string "<="
-                   space
-                   LEE t <$> pExpr
 
                  ||| return t
 
 -- |Parses factors from the user
 pFactor :: Parser Expr
-pFactor = do string "input"
+pFactor = do space 
+             string "input"
+             space
              return Input
        --parse a float
          ||| do d <- digit ||| char '-'
@@ -343,15 +398,21 @@ pFactor = do string "input"
                 char '.'
                 n <- digit
                 ns <- many digit
+                space
                 return (Val (FloatVal (digitsToFloat ( (d:ds) ++ "." ++ (n:ns) ) )))
        --parse an integer
          ||| do d <- digit ||| char '-'
                 ds <- many digit
+                space
                 return (Val (IntVal (digitsToInt (d:ds))))
        --parse an expression inside brackets
-         ||| do  char '('
+         ||| do  space 
+                 char '('
+                 space
                  e <- pExpr
+                 space
                  char ')'
+                 space 
                  return e
        --parse a string that was given in quotes
          ||| do space
@@ -361,7 +422,8 @@ pFactor = do string "input"
                 space
                 return (Val (StrVal e))
        --parse toString function
-         ||| do string "toString("
+         ||| do space
+                string "toString("
                 space
                 e <- pExpr
                 space

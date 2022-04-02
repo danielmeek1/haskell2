@@ -111,7 +111,7 @@ notSemiColon                  = sat (/= ';')
 blockString                   :: Parser String
 blockString                   = many notEndOFBlock
 
-notEndOFBlock                 :: Parser Char 
+notEndOFBlock                 :: Parser Char
 notEndOFBlock                 = sat (/= '}')
 
 char                          :: Char -> Parser Char
@@ -149,7 +149,6 @@ int                           =  do char '-'
 space                         :: Parser ()
 space                         =  do many (sat isSpace)
                                     return ()
-
 
 {-
 Ignoring spacing

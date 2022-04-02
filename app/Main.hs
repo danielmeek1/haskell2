@@ -10,4 +10,6 @@ main = do
     args <- getArgs
     if null args then
         repl initLState else
-            executeCommand initLState ("file \0" ++ head args ++ "\0") >> executeCommand initLState "quit"
+            case parse pCommand ("file \0" ++ head args ++ "\0") of
+                [(cmd, "")] -> process initLState (cmd:[Quit])
+                _           -> error "Parse Error"

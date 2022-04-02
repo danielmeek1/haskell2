@@ -31,11 +31,11 @@ process st [] = repl st
      process set command when setting to an input
 -}
 process st ((Set var Input):cs)    = do inp <- usrIn
-                                        process (LState (updateVars var (StrVal inp) (vars st))) cs
+                                        process (st {vars = updateVars var (StrVal inp) (vars st)}) cs
 {-
      process Set command
 -}
-process st ((Set var e):cs)        =    process (LState (updateVars var (removeMaybe (eval (vars st) e)) (vars st))) cs
+process st ((Set var e):cs)        =    process (st {vars =  updateVars var (removeMaybe (eval (vars st) e)) (vars st)}) cs
 {-
      process Print command
 -}
@@ -45,9 +45,8 @@ process st ((Print e):cs)          = do print (removeMaybe (eval (vars st) e))
      process file command command
 -}
 process st ((File f):cs)           = do exists <-  doesFileExist f
-                                        processFile st f exists
-                                        process st cs
-                       
+                                        processFile st f exists cs
+
 {-
      process block statement
 -}
@@ -62,6 +61,18 @@ process st ((If e t f):cs)         = case eval (vars st) e of
                                         Just (Error e)           -> process st (Print (Val(Error e)):cs)
                                         _                        -> process st (Print (Val(Error "If statement was not given a valid boolean expression")):cs)
 
+process st ((Repeat n c):cs)       = case eval (vars st) n of
+                                        Just (IntVal i)          -> do
+                                                                           processRepeat st i c cs
+                                        Just (Error e)           -> process st (Print (Val(Error e)):cs)
+                                        _                        -> process st (Print (Val(Error "Repeat must be given an integer number of repeats")):cs)
+
+process st ((For (Var i) t m c):cs)  = processLoop st i t m c cs
+
+process st ((While e c):cs)        = processWhile st e c cs
+
+process st (For {}:cs)               = process st (Print (Val(Error "Malformed for loop, usage:\nfor(<variable>;<target>;<method>)<command block>")):cs)
+
 {-
      process NoCommand command (user has not provided any input)
 -}
@@ -72,12 +83,30 @@ process st (NoCommand:cs)  = process st cs
 process st (Quit:cs)       = exitSuccess
 
 -- |Converts the contents of a file to a list of commands and processes them
-processFile :: LState -> String -> Bool -> IO()
-processFile st f e | e         =  do
-                                   contents <- readFile f
-                                   let commands = map (\l -> fst(head (parse pCommand (replaceChars l '"' '\0')) )) (lines contents) --parses contents of a file into list of commands
-                                   process st commands
-                   | otherwise =   process st [Print (Val(Error ("File '" ++ f ++ "' does not exist")))]
+processFile :: LState -> String -> Bool -> [Command] -> IO()
+processFile st f e cs | e         =  do
+                                        contents <- readFile f
+                                        let commands = map (\l -> fst(head (parse pCommand (replaceChars l '"' '\0')) )) (lines contents) --parses contents of a file into list of commands
+                                        process st (commands++cs)
+                      | otherwise =   process st (Print (Val(Error ("File '" ++ f ++ "' does not exist"))):cs)
+
+processRepeat :: LState -> Int -> Command -> [Command] -> IO ()
+processRepeat st i = processLoop (st {vars = updateVars "\0\0" (IntVal 0) (vars st)}) "\0\0" (EQU (Var "\0\0") (Val (IntVal i))) (Set "\0\0" (Add (Val (IntVal 1)) (Var "\0\0")))
+
+
+processLoop :: LState -> Name -> Expr -> Command -> Command -> [Command] -> IO ()
+processLoop st i t m c cs = case eval (vars st) t of
+                              Just (Boolean True)      -> process st cs
+                              Just (Boolean False)     -> process st (c:m:For (Var i) t m c:cs)
+                              Just (Error e)           -> process st (Print (Val(Error e)):cs)
+                              _                        -> process st (Print (Val(Error "Loop was not given a valid boolean expression")):cs)
+
+processWhile :: LState -> Expr -> Command -> [Command] -> IO ()
+processWhile st e c cs = case eval (vars st) e of
+                              Just (Boolean False)     -> process st cs
+                              Just (Boolean True)      -> process st (c:While e c:cs)
+                              Just (Error e)           -> process st (Print (Val(Error e)):cs)
+                              _                        -> process st (Print (Val(Error "Loop was not given a valid boolean expression")):cs)
 
 
 

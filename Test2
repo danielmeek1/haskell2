@@ -1,4 +1,4 @@
-y = 3
-z = "5"
-x = y + toInt(z)
-print(z + " + 3 = " + toString(x))
+y = 3;
+z = "5";
+x = y + toInt(z);
+print(z + " + 3 = " + toString(x));
