@@ -47,6 +47,7 @@ process st ((Print e):cs)          = do print (removeMaybe (eval (vars st) e))
 process st ((File f):cs)           = do exists <-  doesFileExist f
                                         processFile st f exists
                                         process st cs
+
 {-
      process NoCommand command (user has not provided any input)
 -}
@@ -63,6 +64,9 @@ processFile st f e | e         =  do
                                    let commands = map (\l -> fst(head (parse pCommand (replaceChars l '"' '\0')) )) (lines contents) --parses contents of a file into list of commands
                                    process st commands
                    | otherwise =   process st [Print (Val(Error ("File '" ++ f ++ "' does not exist")))]
+
+
+
 
 -- |Returns a string entered by a user
 usrIn :: IO String

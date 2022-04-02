@@ -100,6 +100,20 @@ printable                     = sat isPrint
 oneSpace                      :: Parser Char
 oneSpace                      = sat isSpace
 
+commandString                 :: Parser String
+commandString                 = do s <- many notSemiColon
+                                   char ';'
+                                   return s
+
+notSemiColon                  :: Parser Char
+notSemiColon                  = sat (/= ';')
+
+blockString                   :: Parser String
+blockString                   = many notEndOFBlock
+
+notEndOFBlock                 :: Parser Char 
+notEndOFBlock                 = sat (/= '}')
+
 char                          :: Char -> Parser Char
 char x                        =  sat (== x)
 

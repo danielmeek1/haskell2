@@ -20,6 +20,13 @@ data Expr = Add      Expr Expr     --add two numbers or concatenate  two strings
           | Val      Value         --a value
           | Var      Name          --a variable name
           | Input                  --recieve input from user
+          | EQU      Expr Expr     --check if both expressions are equal
+          | NQU      Expr Expr     --check if both expressions are not equal
+          | LTH      Expr Expr     --check if first expression is less than the second
+          | GTH      Expr Expr     --check if first expression is greater than the second
+          | LEE      Expr Expr     --check if first expression is less than or equal to the second
+          | GRE      Expr Expr     --check if first expression is greater than or equal to the second
+
   deriving Show
 
 instance Show Value where
@@ -27,13 +34,30 @@ instance Show Value where
   show (FloatVal a)  = show a
   show (StrVal a)    = a
   show (Error a)     = a
+  show (Boolean a)   = show a
+
+instance Eq Value where
+       (==) (IntVal a)      (IntVal b)        = a == b
+       (==) (IntVal a)      (FloatVal b)      = fromIntegral a == b
+       (==) (FloatVal a)    (IntVal b)        = a == fromIntegral b
+       (==) (FloatVal a)    (FloatVal b)      = a == b
+       (==) (StrVal a)      (StrVal b)        = a == b
+       (==) (Boolean a)     (Boolean b )      = a == b
+       (==) _               _                 = False
+
+instance Ord Value where
+       compare (IntVal a)      (IntVal b)      = compare a b
+       compare (IntVal a)      (FloatVal b)    = compare (fromIntegral a) b
+       compare (FloatVal a)    (IntVal b)      = compare  a (fromIntegral b)
+       compare (FloatVal a)    (FloatVal b)    = compare a b
+       compare _               _               = error "not comparable" -- checked by eval where it is handled properly
 
 -- |Command that is executed by process
-data Command = Set          Name Expr     -- assign an expression to a variable name
-             | Print        Expr          -- evaluate an expression and print the result
-             | File         String        -- load a file and execute commands within it.
-             | Quit                       -- Exit the system
-             | NoCommand                  -- user did not enter a command
+data Command = Set          Name Expr                   -- assign an expression to a variable name
+             | Print        Expr                        -- evaluate an expression and print the result
+             | File         String                      -- load a file and execute commands within it.
+             | Quit                                     -- Exit the system
+             | NoCommand                                -- user did not enter a command
   deriving Show
 
 -- |Value that is used in the script
@@ -41,6 +65,7 @@ data Value = IntVal         Int           --Integer
            | FloatVal       Float         --Float
            | StrVal         String        --String
            | Error          String        --Error
+           | Boolean        Bool          --Boolean
 
 -- |Name-value pair that represents a variable
 newtype Variable = Variable (Name,Value)
@@ -144,6 +169,44 @@ eval vars (Mod x y) = case (eval vars x, eval vars y) of
                            (_,Just (Error e))                         -> Just (Error e)
                            _                                          -> Just (Error "'%' operator must be used between two Integers")
 
+eval vars (EQU x y) = case (eval vars x, eval vars y) of
+                           (Just x,Just y)                            -> Just ( Boolean (x == y))
+                           (Just (Error e),_)                         -> Just (Error e)
+                           (_,Just (Error e))                         -> Just (Error e)
+                           _                                          -> Just (Error "Not a valid boolean expression")
+
+eval vars (NQU x y) = case (eval vars x, eval vars y) of
+                           (Just x,Just y)                            -> Just ( Boolean (x /= y))
+                           (Just (Error e),_)                         -> Just (Error e)
+                           (_,Just (Error e))                         -> Just (Error e)
+                           _                                          -> Just (Error "Not a valid boolean expression")
+
+eval vars (LTH x y) = case (eval vars x, eval vars y) of
+                           (Just x,Just y)                            -> Just ( Boolean (x < y))
+                           (Just (Error e),_)                         -> Just (Error e)
+                           (_,Just (Error e))                         -> Just (Error e)
+                           _                                          -> Just (Error "'Not a valid boolean expression")
+
+eval vars (GTH x y) = case (eval vars x, eval vars y) of
+                           (Just x,Just y)                            -> Just ( Boolean (x > y))
+                           (Just (Error e),_)                         -> Just (Error e)
+                           (_,Just (Error e))                         -> Just (Error e)
+                           _                                          -> Just (Error "'Not a valid boolean expression")
+
+eval vars (LEE x y) = case (eval vars x, eval vars y) of
+                           (Just x,Just y)                            -> Just ( Boolean (x <= y))
+                           (Just (Error e),_)                         -> Just (Error e)
+                           (_,Just (Error e))                         -> Just (Error e)
+                           _                                          -> Just (Error "'Not a valid boolean expression")
+
+eval vars (GRE x y) = case (eval vars x, eval vars y) of
+                           (Just x,Just y)                            -> Just ( Boolean (x >= y))
+                           (Just (Error e),_)                         -> Just (Error e)
+                           (_,Just (Error e))                         -> Just (Error e)
+                           _                                          -> Just (Error "'Not a valid boolean expression")
+
+
+
 {-
        Evaluate ToString
 -}
@@ -215,12 +278,42 @@ pExpr = do t <- pTerm
                    space
                    char '|'
                    return (Abs e)
+            ||| do space
+                   string "=="
+                   space
+                   EQU t <$> pExpr
+
+            ||| do space
+                   string "!="
+                   space
+                   NQU t <$> pExpr
+
+            ||| do space
+                   string "<"
+                   space
+                   LTH t <$> pExpr
+
+            ||| do space
+                   string ">"
+                   space
+                   GTH t <$> pExpr
+
+            ||| do space
+                   string ">="
+                   space
+                   GRE t <$> pExpr
+
+            ||| do space
+                   string "<="
+                   space
+                   LEE t <$> pExpr
+
                  ||| return t
 
 -- |Parses factors from the user
 pFactor :: Parser Expr
 pFactor = do string "input"
-             return Input   
+             return Input
        --parse a float
          ||| do d <- digit ||| char '-'
                 ds <- many digit
