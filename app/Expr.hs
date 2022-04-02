@@ -8,24 +8,25 @@ type Name = String
 
 
 -- |Expression that will be evaluated by eval
-data Expr = Add      Expr Expr     --add two numbers or concatenate  two strings
-          | Sub      Expr Expr     --subtrace two numbers
-          | Mult     Expr Expr     --multiply two numbers
-          | Div      Expr Expr     --divide two numbers
-          | Abs      Expr          --find the absolute value of a number
-          | Pow      Expr Expr     --find value of an exponential
-          | Mod      Expr Expr     --find the modulus of given numbers
-          | ToString Expr          --convert a number to a string
-          | ToInt    Expr          --convert a string to an integer 
-          | Val      Value         --a value
-          | Var      Name          --a variable name
-          | Input                  --recieve input from user
-          | EQU      Expr Expr     --check if both expressions are equal
-          | NQU      Expr Expr     --check if both expressions are not equal
-          | LTH      Expr Expr     --check if first expression is less than the second
-          | GTH      Expr Expr     --check if first expression is greater than the second
-          | LEE      Expr Expr     --check if first expression is less than or equal to the second
-          | GRE      Expr Expr     --check if first expression is greater than or equal to the second
+data Expr = Add      Expr          Expr     --add two numbers or concatenate  two strings
+          | Sub      Expr          Expr     --subtrace two numbers
+          | Mult     Expr          Expr     --multiply two numbers
+          | Div      Expr          Expr     --divide two numbers
+          | Abs      Expr                   --find the absolute value of a number
+          | Pow      Expr          Expr     --find value of an exponential
+          | Mod      Expr          Expr     --find the modulus of given numbers
+          | ToString Expr                   --convert a number to a string
+          | ToInt    Expr                   --convert a string to an integer 
+          | Val      Value                  --a value
+          | Var      Name                   --a variable name
+          | Input                           --recieve input from user
+          | EQU      Expr          Expr     --check if both expressions are equal
+          | NQU      Expr          Expr     --check if both expressions are not equal
+          | LTH      Expr          Expr     --check if first expression is less than the second
+          | GTH      Expr          Expr     --check if first expression is greater than the second
+          | LEE      Expr          Expr     --check if first expression is less than or equal to the second
+          | GRE      Expr          Expr     --check if first expression is greater than or equal to the second
+
 
   deriving Show
 
@@ -35,6 +36,7 @@ instance Show Value where
   show (StrVal a)    = a
   show (Error a)     = a
   show (Boolean a)   = show a
+
 
 instance Eq Value where
        (==) (IntVal a)      (IntVal b)        = a == b
@@ -56,6 +58,8 @@ instance Ord Value where
 data Command = Set          Name Expr                   -- assign an expression to a variable name
              | Print        Expr                        -- evaluate an expression and print the result
              | File         String                      -- load a file and execute commands within it.
+             | Block        String                      -- List of commands
+             | If           Expr Command Command        -- if-else statement
              | Quit                                     -- Exit the system
              | NoCommand                                -- user did not enter a command
   deriving Show
@@ -253,6 +257,25 @@ pCommand = do t <- letter
                    t <- many printable
                    char '\0'
                    return (File t)
+            ||| do string "if("
+                   e <- pExpr
+                   space
+                   char ')'
+                   t <-pCommand
+                   space
+                   string "else"
+                   If e t <$> pCommand
+            ||| do string "if("
+                   e <- pExpr
+                   space
+                   char ')'
+                   t <-pCommand
+                   return (If e t NoCommand)
+            ||| do space
+                   char '{'
+                   cs <- blockString
+                   char '}'
+                   return (Block cs)
 
             ||| do string ""
                    return NoCommand

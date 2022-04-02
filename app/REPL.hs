@@ -47,6 +47,20 @@ process st ((Print e):cs)          = do print (removeMaybe (eval (vars st) e))
 process st ((File f):cs)           = do exists <-  doesFileExist f
                                         processFile st f exists
                                         process st cs
+                       
+{-
+     process block statement
+-}
+process st ((Block as):cs)         = process st (map (\l -> fst(head (parse pCommand (replaceChars l '"' '\0')) )) (splitCommands as) ++ cs)
+
+{-
+     process if statement
+-}
+process st ((If e t f):cs)         = case eval (vars st) e of
+                                        Just (Boolean True)      -> process st (t:cs)
+                                        Just (Boolean False)     -> process st (f:cs)
+                                        Just (Error e)           -> process st (Print (Val(Error e)):cs)
+                                        _                        -> process st (Print (Val(Error "If statement was not given a valid boolean expression")):cs)
 
 {-
      process NoCommand command (user has not provided any input)
@@ -96,3 +110,13 @@ executeCommand st inp = case parse pCommand (replaceChars inp '"' '\0') of
 -- |Replaces all instances of a character in a string with another
 replaceChars :: String -> Char -> Char -> String
 replaceChars s c1 c2 = map (\c -> if c==c1 then c2 else c) s
+
+{- |Splits a string on ';' character
+code is a modified version of "lines" from prelude - found at: 
+https://www.haskell.org/onlinereport/standard-prelude.html-}
+splitCommands            :: String -> [String]
+splitCommands ""         =  []
+splitCommands s          =  let (l, s') = break (== ';') s
+                      in  l : case s' of
+                                []      -> []
+                                (_:s'') -> splitCommands s''
