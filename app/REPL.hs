@@ -6,10 +6,11 @@ import BinaryTree
 
 import System.IO ()
 import System.Console.Haskeline
-    ( getInputLine, defaultSettings, runInputT, InputT )
 import System.Exit ( exitSuccess )
 import System.Directory ( doesFileExist )
+import System.Environment
 
+import Data.List (isPrefixOf)
 -- |The system state
 data LState = LState {
                 -- | variables in the program
@@ -18,6 +19,10 @@ data LState = LState {
 -- |The starting state of the program
 initLState :: LState
 initLState = LState Leaf
+
+
+hlineSettings :: Settings IO
+hlineSettings = Settings { historyFile = Just "inputHistory", complete = completeWord Nothing " \t" $ return . findCommand, autoAddHistory = True}
 
 {- |Given a variable name and a value, return a new set of variables with
 that name and value added.
@@ -121,7 +126,7 @@ processWhile st e c cs = case eval (vars st) e of
 
 -- |Returns a string entered by a user
 usrIn :: IO String
-usrIn =  runInputT defaultSettings input
+usrIn =  runInputT hlineSettings input
    where
       input :: InputT IO String
       input = do
@@ -148,3 +153,11 @@ stringToExpr ::String -> Expr
 stringToExpr s = case parse pExpr  (replaceChars s '"' '\0') of
                               [(exp, "")]    -> exp
                               _              -> Val (Error "Not a valid expression")
+
+
+commandStrings :: [String]
+commandStrings = [ "quit", "exit", "print", "args(", "if(", "else","repeat","for(","while(","input","toString(","toInt("]
+
+findCommand :: String -> [Completion]
+findCommand str = map simpleCompletion $ filter (str `isPrefixOf`) commandStrings
+
