@@ -225,7 +225,7 @@ eval vars (GRE x y) = case (eval vars x, eval vars y) of
                            _                                          -> Just (Error "'Not a valid boolean expression")
 
 eval vars (FuncDef ns (Block cs)) = Just (Funct (Function (split ',' ns) (map stringToCommand (split ';' cs))))
-eval vars (FuncDef ns c) = Just (Funct (Function (split ',' ns) (c:[])))
+eval vars (FuncDef ns c) = Just (Funct (Function (split ',' ns) [c]))
 
 
 
@@ -246,7 +246,6 @@ eval vars (ToInt x) = case eval vars x of
 
 -- |Converts a list of numeric characters to a single integer
 digitsToInt :: [Char] -> Int
-digitsToInt [] = error "No numbers given"
 digitsToInt ds = read ds ::Int
 
 -- |Converts a list of numeric characters to a single floating point number
@@ -380,29 +379,32 @@ pExpr = do t <- pTerm
                    char '|'
                    space
                    return (Abs e)
+       --parse '==' operator
             ||| do space
                    string "=="
                    space
                    EQU t <$> pExpr
-
+       --parse '!=' operator
             ||| do space
                    string "!="
                    space
                    NQU t <$> pExpr
+       --parse '>=' operator
             ||| do space
                    string ">="
                    space
                    GRE t <$> pExpr
-
+       --parse '<=' operator
             ||| do space
                    string "<="
                    space
                    LEE t <$> pExpr
+       --parse '<' operator
             ||| do space
                    string "<"
                    space
                    LTH t <$> pExpr
-
+       --parse '>' operator
             ||| do space
                    string ">"
                    space
@@ -431,6 +433,7 @@ pFactor = do space
                 ds <- many digit
                 space
                 return (Val (IntVal (digitsToInt (d:ds))))
+       --parse a string comtaining arguments
          ||| do string "args("
                 space
                 as <- argNameString
