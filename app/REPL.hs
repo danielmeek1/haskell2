@@ -11,9 +11,9 @@ import System.Exit ( exitSuccess )
 import System.Directory ( doesFileExist )
 
 -- |The system state
-newtype LState = LState {
+data LState = LState {
                 -- | variables in the program
-                vars :: BTree Variable }
+                vars :: BTree Variable}
 
 -- |The starting state of the program
 initLState :: LState
@@ -50,7 +50,7 @@ process st ((File f):cs)           = do exists <-  doesFileExist f
 {-
      process block statement
 -}
-process st ((Block as):cs)         = process st (map (\l -> fst(head (parse pCommand (replaceChars l '"' '\0')) )) (splitCommands as) ++ cs)
+process st ((Block as):cs)         = process st (map stringToCommand (split '}' as) ++ cs)
 
 {-
      process if statement
@@ -69,9 +69,17 @@ process st ((Repeat n c):cs)       = case eval (vars st) n of
 
 process st ((For (Var i) t m c):cs)  = processLoop st i t m c cs
 
-process st ((While e c):cs)        = processWhile st e c cs
+process st ((While e c):cs)          = processWhile st e c cs
 
 process st (For {}:cs)               = process st (Print (Val(Error "Malformed for loop, usage:\nfor(<variable>;<target>;<method>)<command block>")):cs)
+
+process st ((ExecFunc n args) :cs)   = case eval (vars st) (Var n) of
+                                        Just (Funct (Function ns fcs))   -> do
+                                                                      let vs = split ',' args
+                                                                      let newVars = zip ns vs
+                                                                      let assignments = map (\(n,v) -> Set n  (stringToExpr v)) newVars
+                                                                      process st (assignments++fcs++cs)
+                                        _                        -> process st (Print (Val(Error (n++" is not a function"))):cs)
 
 {-
      process NoCommand command (user has not provided any input)
@@ -86,7 +94,7 @@ process st (Quit:cs)       = exitSuccess
 processFile :: LState -> String -> Bool -> [Command] -> IO()
 processFile st f e cs | e         =  do
                                         contents <- readFile f
-                                        let commands = map (\l -> fst(head (parse pCommand (replaceChars l '"' '\0')) )) (lines contents) --parses contents of a file into list of commands
+                                        let commands = map stringToCommand (lines contents) --parses contents of a file into list of commands
                                         process st (commands++cs)
                       | otherwise =   process st (Print (Val(Error ("File '" ++ f ++ "' does not exist"))):cs)
 
@@ -136,16 +144,7 @@ executeCommand st inp = case parse pCommand (replaceChars inp '"' '\0') of
                               _ -> do putStrLn "parse error"
                                       repl st
 
--- |Replaces all instances of a character in a string with another
-replaceChars :: String -> Char -> Char -> String
-replaceChars s c1 c2 = map (\c -> if c==c1 then c2 else c) s
-
-{- |Splits a string on ';' character
-code is a modified version of "lines" from prelude - found at: 
-https://www.haskell.org/onlinereport/standard-prelude.html-}
-splitCommands            :: String -> [String]
-splitCommands ""         =  []
-splitCommands s          =  let (l, s') = break (== ';') s
-                      in  l : case s' of
-                                []      -> []
-                                (_:s'') -> splitCommands s''
+stringToExpr ::String -> Expr
+stringToExpr s = case parse pExpr  (replaceChars s '"' '\0') of
+                              [(exp, "")]    -> exp
+                              _              -> Val (Error "Not a valid expression")

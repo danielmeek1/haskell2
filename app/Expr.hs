@@ -26,8 +26,7 @@ data Expr = Add      Expr          Expr     --add two numbers or concatenate  tw
           | GTH      Expr          Expr     --check if first expression is greater than the second
           | LEE      Expr          Expr     --check if first expression is less than or equal to the second
           | GRE      Expr          Expr     --check if first expression is greater than or equal to the second
-
-
+          | FuncDef  String        Command  --function argument names and function commands
   deriving Show
 
 instance Show Value where
@@ -36,6 +35,7 @@ instance Show Value where
   show (StrVal a)    = a
   show (Error a)     = a
   show (Boolean a)   = show a
+  show (Funct f)     = show f
 
 
 instance Eq Value where
@@ -64,6 +64,7 @@ data Command = Set          Name Expr                   -- assign an expression 
              | For          Expr Expr Command Command   -- for loop
              | While        Expr Command                -- while loop
              | Quit                                     -- Exit the system
+             | ExecFunc     String Name                 -- Execute a function
              | NoCommand                                -- user did not enter a command
   deriving Show
 
@@ -73,6 +74,7 @@ data Value = IntVal         Int           --Integer
            | StrVal         String        --String
            | Error          String        --Error
            | Boolean        Bool          --Boolean
+           | Funct          Function      --Function
 
 -- |Name-value pair that represents a variable
 newtype Variable = Variable (Name,Value)
@@ -82,6 +84,16 @@ instance Eq Variable where
 
 instance Ord Variable where
        compare (Variable (n1,_)) (Variable (n2,_))      = compare n1 n2
+
+
+data Function = Function {
+                args    ::    [Name],
+                commands::    [Command]
+}
+
+instance Show Function where
+       show (Function a c) = show a
+
 
 -- | Evaluate an expression based on given variables and return the result
 eval :: BTree Variable -> -- Variable name to value mapping
@@ -212,6 +224,10 @@ eval vars (GRE x y) = case (eval vars x, eval vars y) of
                            (_,Just (Error e))                         -> Just (Error e)
                            _                                          -> Just (Error "'Not a valid boolean expression")
 
+eval vars (FuncDef ns (Block cs)) = Just (Funct (Function (split ',' ns) (map stringToCommand (split ';' cs))))
+eval vars (FuncDef ns c) = Just (Funct (Function (split ',' ns) (c:[])))
+
+
 
 
 {-
@@ -240,12 +256,23 @@ digitsToFloat ds = read ds ::Float
 
 -- |Parses commands from the user
 pCommand :: Parser Command
-pCommand = do t <- letter
-              ts <- many letter
-              space
-              char '='
-              space
-              Set (t:ts) <$> pExpr
+pCommand =      do t <- letter
+                   ts <- many letter
+                   space
+                   string "args("
+                   space
+                   as <- argNameString
+                   space
+                   char ')'
+                   space
+                   return (ExecFunc (t:ts) as )
+
+            ||| do t <- letter
+                   ts <- many letter
+                   space
+                   char '='
+                   space
+                   Set (t:ts) <$> pExpr
 
             ||| do space
                    string "print"
@@ -253,7 +280,7 @@ pCommand = do t <- letter
                    Print <$> pExpr
 
             ||| do space
-                   string "quit"
+                   string "quit" ||| string "exit"
                    space
                    return Quit
 
@@ -301,33 +328,32 @@ pCommand = do t <- letter
                    n <- pExpr
                    space
                    Repeat n <$> pCommand
-            ||| do space 
+            ||| do space
                    string "for("
-                   space 
+                   space
                    i <- pExpr
-                   space 
+                   space
                    char ';'
-                   space 
+                   space
                    t <- pExpr
                    space
                    char ';'
-                   space 
+                   space
                    m <- pCommand
                    space
                    char ')'
-                   space 
+                   space
                    c <- pCommand
                    space
                    return (For i t m c)
             ||| do space
                    string "while("
-                   space 
+                   space
                    e <- pExpr
-                   space 
+                   space
                    char ')'
-                   space 
-                   c <- pCommand
-                   return (While e c)
+                   space
+                   While e <$> pCommand
 
             ||| do string ""
                    return NoCommand
@@ -388,7 +414,7 @@ pExpr = do t <- pTerm
 
 -- |Parses factors from the user
 pFactor :: Parser Expr
-pFactor = do space 
+pFactor = do space
              string "input"
              space
              return Input
@@ -405,14 +431,21 @@ pFactor = do space
                 ds <- many digit
                 space
                 return (Val (IntVal (digitsToInt (d:ds))))
+         ||| do string "args("
+                space
+                as <- argNameString
+                space
+                char ')'
+                space
+                FuncDef as <$> pCommand
        --parse an expression inside brackets
-         ||| do  space 
+         ||| do  space
                  char '('
                  space
                  e <- pExpr
                  space
                  char ')'
-                 space 
+                 space
                  return e
        --parse a string that was given in quotes
          ||| do space
@@ -472,3 +505,22 @@ pTerm = do f <- pFactor
 removeMaybe :: Maybe a ->  a
 removeMaybe (Just a) = a
 removeMaybe Nothing  = error "No value"
+
+stringToCommand          :: String -> Command
+stringToCommand s        = case parse pCommand (replaceChars s '"' '\0') of
+                              [(cmd, "")] -> cmd
+                              _           -> Print (Val(Error "parse error"))
+
+-- |Replaces all instances of a character in a string with another
+replaceChars :: String -> Char -> Char -> String
+replaceChars s c1 c2 = map (\c -> if c==c1 then c2 else c) s
+
+{- |Splits a string on a given character
+code is a modified version of "lines" from prelude - found at: 
+https://www.haskell.org/onlinereport/standard-prelude.html-}
+split              :: Char -> String -> [String]
+split c ""         =  []
+split c s          =  let (l, s') = break (== c) s
+                      in  l : case s' of
+                                []      -> []
+                                (_:s'') -> split c s''

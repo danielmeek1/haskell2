@@ -114,6 +114,9 @@ blockString                   = many notEndOFBlock
 notEndOFBlock                 :: Parser Char
 notEndOFBlock                 = sat (/= '}')
 
+argNameString                 :: Parser String
+argNameString                 = many (sat (/=')'))
+
 char                          :: Char -> Parser Char
 char x                        =  sat (== x)
 
