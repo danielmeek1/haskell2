@@ -1,0 +1,2 @@
+x = 3
+if(2==2){print(x); print"there";}else{print"no";}
