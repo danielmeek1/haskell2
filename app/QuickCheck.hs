@@ -41,9 +41,6 @@ prop_MultInt x y = eval (vars initLState) (Mult (Val (IntVal x)) (Val (IntVal y)
 prop_MultFloat :: Float -> Float -> Bool
 prop_MultFloat x y = eval (vars initLState) (Mult (Val (FloatVal x)) (Val (FloatVal y)))  == Just (FloatVal (x * y))
 
-prop_Div :: Float -> Float -> Bool
-prop_Div x y = eval (vars initLState) (Div (Val (FloatVal x)) (Val (FloatVal y)))  == Just (FloatVal (x / y))
-
 
 
 
