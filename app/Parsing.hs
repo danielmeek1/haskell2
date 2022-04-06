@@ -100,6 +100,10 @@ printable                     = sat isPrint
 blockString                   :: Parser String
 blockString                   = many (sat (/= '}'))
 
+sqBlockString                   :: Parser String
+sqBlockString                   = many (sat (/= ']'))
+
+
 argNameString                 :: Parser String
 argNameString                 = many (sat (/=')'))
 

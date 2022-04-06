@@ -4,6 +4,7 @@ import System.Console.Haskeline
 
 import Data.Char ( isDigit )
 import BinaryTree
+import Parsing (sqBlockString)
 type Name = String
 
 
@@ -38,22 +39,6 @@ instance Show Value where
   show (Funct f)     = show f
 
 
-instance Eq Value where
-       (==) (IntVal a)      (IntVal b)        = a == b
-       (==) (IntVal a)      (FloatVal b)      = fromIntegral a == b
-       (==) (FloatVal a)    (IntVal b)        = a == fromIntegral b
-       (==) (FloatVal a)    (FloatVal b)      = a == b
-       (==) (StrVal a)      (StrVal b)        = a == b
-       (==) (Boolean a)     (Boolean b )      = a == b
-       (==) _               _                 = False
-
-instance Ord Value where
-       compare (IntVal a)      (IntVal b)      = compare a b
-       compare (IntVal a)      (FloatVal b)    = compare (fromIntegral a) b
-       compare (FloatVal a)    (IntVal b)      = compare  a (fromIntegral b)
-       compare (FloatVal a)    (FloatVal b)    = compare a b
-       compare _               _               = error "not comparable" -- checked by eval where it is handled properly
-
 -- |Command that is executed by process
 data Command = Set          Name Expr                   -- assign an expression to a variable name
              | Print        Expr                        -- evaluate an expression and print the result
@@ -75,6 +60,22 @@ data Value = IntVal         Int           --Integer
            | Error          String        --Error
            | Boolean        Bool          --Boolean
            | Funct          Function      --Function
+
+instance Eq Value where
+       (==) (IntVal a)      (IntVal b)        = a == b
+       (==) (IntVal a)      (FloatVal b)      = fromIntegral a == b
+       (==) (FloatVal a)    (IntVal b)        = a == fromIntegral b
+       (==) (FloatVal a)    (FloatVal b)      = a == b
+       (==) (StrVal a)      (StrVal b)        = a == b
+       (==) (Boolean a)     (Boolean b )      = a == b
+       (==) _               _                 = False
+
+instance Ord Value where
+       compare (IntVal a)      (IntVal b)      = compare a b
+       compare (IntVal a)      (FloatVal b)    = compare (fromIntegral a) b
+       compare (FloatVal a)    (IntVal b)      = compare  a (fromIntegral b)
+       compare (FloatVal a)    (FloatVal b)    = compare a b
+       compare _               _               = error "not comparable" -- checked by eval where it is handled properly
 
 -- |Name-value pair that represents a variable
 newtype Variable = Variable (Name,Value)
@@ -150,7 +151,7 @@ eval vars (Mult x y) = case (eval vars x, eval vars y) of
        Evaluate division
 -}
 eval vars (Div x y) = case (eval vars x, eval vars y) of
-                           (Just (IntVal x),Just (IntVal y))          -> Just (IntVal (x `div` y))
+                           (Just (IntVal x),Just (IntVal y))          -> Just (FloatVal (fromIntegral x / fromIntegral y))
                            (Just (IntVal x),Just (FloatVal y))        -> Just (FloatVal (fromIntegral x / y))
                            (Just (FloatVal x),Just (IntVal y))        -> Just (FloatVal (x / fromIntegral y))
                            (Just (FloatVal x),Just (FloatVal y))      -> Just (FloatVal (x / y))
@@ -224,8 +225,8 @@ eval vars (GRE x y) = case (eval vars x, eval vars y) of
                            (_,Just (Error e))                         -> Just (Error e)
                            _                                          -> Just (Error "'Not a valid boolean expression")
 
-eval vars (FuncDef ns (Block cs)) = Just (Funct (Function (split ',' ns) (map stringToCommand (split ';' cs))))
-eval vars (FuncDef ns c) = Just (Funct (Function (split ',' ns) [c]))
+eval vars (FuncDef ns (Block cs))  = Just (Funct (Function (split ',' ns) (map stringToCommand (split ';' cs))))
+eval vars (FuncDef ns c)           = Just (Funct (Function (split ',' ns) [c]))
 
 
 
@@ -319,6 +320,14 @@ pCommand =      do t <- letter
                    cs <- blockString
                    space
                    char '}'
+                   space
+                   return (Block cs)
+            ||| do space
+                   char '['
+                   space
+                   cs <- sqBlockString
+                   space
+                   char ']'
                    space
                    return (Block cs)
             ||| do space

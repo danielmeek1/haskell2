@@ -63,7 +63,7 @@ process st ((File f):cs)           = do exists <-  doesFileExist f
 {-
      process block statement
 -}
-process st ((Block as):cs)         = process st (map stringToCommand (split '}' as) ++ cs)
+process st ((Block as):cs)         = process st (map stringToCommand (split ';' as) ++ cs)
 
 {-
      process if statement

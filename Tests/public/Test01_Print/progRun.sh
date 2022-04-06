@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./dist-newstyle/build/haskell2 Tests/TestFiles/TestBasic
+./dist/build/haskell2/haskell2 ../Tests/TestFiles/TestBasic
