@@ -151,7 +151,7 @@ eval vars (Mult x y) = case (eval vars x, eval vars y) of
        Evaluate division
 -}
 eval vars (Div x y) = case (eval vars x, eval vars y) of
-                           (Just (IntVal x),Just (IntVal y))          -> Just (IntVal (x `div` y))
+                           (Just (IntVal x),Just (IntVal y))          -> Just (FloatVal (fromIntegral x / fromIntegral y))
                            (Just (IntVal x),Just (FloatVal y))        -> Just (FloatVal (fromIntegral x / y))
                            (Just (FloatVal x),Just (IntVal y))        -> Just (FloatVal (x / fromIntegral y))
                            (Just (FloatVal x),Just (FloatVal y))      -> Just (FloatVal (x / y))

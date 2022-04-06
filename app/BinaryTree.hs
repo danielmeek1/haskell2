@@ -1,4 +1,5 @@
 module BinaryTree where
+import Test.QuickCheck (Arbitrary)
 
 -- |A binary tree 
 data BTree a = Leaf
