@@ -1,21 +1,2 @@
-exit
-exit
-if(2==2){print"there"}else{print"no"}
-if(2==2){print"there"}else{print"no"}
-if(2==2){print(x);print"there"}else{print"no"}
-if(2==2){print(x); print"there"}else{print"no"}
-x = 3
-print("5 + 3 = " + toString(x))
-x = y + toInt(z)
-z = "5"
-y = 3
-exit
-print("5 + 3 = " + toString(x))
-print(toString(x))
-x = y + toInt(z)
-z = "5"
-y = 3
-exit
-print 1+2
 quit
 exit
